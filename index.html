@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>2LQR Reader Advanced</title>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        #reader {
+            width: 300px;
+            margin: auto;
+        }
+
+        input {
+            padding: 8px;
+            margin: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 20px;
+        }
+
+        img {
+            margin-top: 10px;
+            max-width: 250px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>2-Level QR Reader (Scan + Upload)</h2>
+
+    <div id="reader"></div>
+
+    <br>
+    <button onclick="startScan()">📷 Start Camera Scan</button>
+
+    <br><br>
+    <input type="file" accept="image/*" onchange="scanFile(event)">
+    <br>
+
+    <input id="key" placeholder="Enter AES Key" />
+
+    <div class="result">
+        <h3>Public Message:</h3>
+        <p id="publicResult"></p>
+
+        <h3>Private Message:</h3>
+        <p id="privateResult"></p>
+    </div>
+
+    <script>
+        let html5QrCode;
+
+        function startScan() {
+            html5QrCode = new Html5Qrcode("reader");
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                qrCodeMessage => {
+                    html5QrCode.stop();
+                    processData(qrCodeMessage);
+                },
+                errorMessage => { }
+            );
+        }
+
+        function scanFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileQr = new Html5Qrcode("reader");
+
+            fileQr.scanFile(file, true)
+                .then(decodedText => {
+                    processData(decodedText);
+                })
+                .catch(err => {
+                    alert("QR not detected in image");
+                });
+        }
+
+        function simpleECCDecode(data) {
+            return data.slice(0, -8); // ตัด parity demo
+        }
+
+        function processData(data) {
+            if (!data.includes("|PRIVATE:")) {
+                document.getElementById("publicResult").innerText = data;
+                document.getElementById("privateResult").innerText = "No Private Data Found";
+                return;
+            }
+
+            const parts = data.split("|PRIVATE:");
+            const publicMsg = parts[0];
+            const privateEncoded = parts[1];
+
+            document.getElementById("publicResult").innerText = publicMsg;
+
+            const key = document.getElementById("key").value;
+
+            try {
+                const eccDecoded = simpleECCDecode(privateEncoded);
+                const bytes = CryptoJS.AES.decrypt(eccDecoded, key);
+                const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+
+                if (!decrypted) throw "Wrong Key";
+
+                document.getElementById("privateResult").innerText = decrypted;
+            } catch (e) {
+                document.getElementById("privateResult").innerText = "Decryption Failed";
+            }
+        }
+    </script>
+
+</body>
+
+</html>
