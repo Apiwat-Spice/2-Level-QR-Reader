@@ -92,8 +92,9 @@
                     processData(decodedText);
                 })
                 .catch(err => {
-                    alert("QR not detected in image");
-                });
+    console.error(err);
+    alert(err);
+});
         }
 
         function simpleECCDecode(data) {
